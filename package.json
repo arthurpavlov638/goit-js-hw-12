@@ -12,7 +12,7 @@
     "glob": "^8.1.0",
     "vite": "^4.5.2"
   },
-  "author": "Ilya Oriekhov <ilya.orekhov@ukr.net>",
+  "author": "Artur Pavlov",
   "license": "ISC",
   "dependencies": {
     "axios": "^1.7.2",
