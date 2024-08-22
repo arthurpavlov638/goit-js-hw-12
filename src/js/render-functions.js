@@ -1,16 +1,43 @@
-export default function imgList(photos) {
-  const markup = photos
-    .map(photo => {
-      return `<li class="photo-item">
-        <a href="${photo.largeImageURL}"><img class="img-item" src="${photo.webformatURL}" alt="${photo.tags}"/></a> 
-        <div class="descr-wrapper">
-        <p class="descr"><span class='label-img'>Likes</span> ${photo.likes}</p>
-        <p class="descr"><span class='label-img'>Views</span> ${photo.views}</p>
-        <p class="descr"><span class='label-img'>Comments</span> ${photo.comments}</p>
-        <p class="descr"><span class='label-img'>Downloads</span> ${photo.downloads}</p>
-        </div>
-      </li>`;
-    })
-    .join('');
-  return markup;
+export default function renderGallery(requestedHits, galleryNode) {
+  let markup = '';
+
+  requestedHits.forEach(
+    ({
+      webformatURL,
+      largeImageURL,
+      tags,
+      likes,
+      views,
+      comments,
+      downloads,
+    }) => {
+      markup += `<li class="gallery-item">
+    <a class="gallery-item__link" href="${largeImageURL}">
+    <img
+    src="${webformatURL}"
+    alt="${tags}"
+    /></a>
+    <ul class="image-descr">
+    <li>
+      <span>Likes</span>
+      <span>${likes}</span>
+    </li>
+    <li>
+      <span>Views</span>
+      <span>${views}</span>
+    </li>
+    <li>
+      <span>Comments</span>
+      <span>${comments}</span>
+    </li>
+    <li>
+      <span>Downloads</span>
+      <span>${downloads}</span>
+    </li>
+  </ul>
+  </li>`;
+    }
+  );
+
+  galleryNode.insertAdjacentHTML('beforeend', markup);
 }

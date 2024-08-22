@@ -1,109 +1,139 @@
+// Описаний у документації
 import iziToast from 'izitoast';
+// Додатковий імпорт стилів
 import 'izitoast/dist/css/iziToast.min.css';
-
+// Описаний у документації
 import SimpleLightbox from 'simplelightbox';
+// Додатковий імпорт стилів
 import 'simplelightbox/dist/simple-lightbox.min.css';
 
-import imgList from './js/render-functions.js';
-import fetchImages from './js/pixabay-api.js';
+import fetchingGallery from './js/pixabay-api';
+import renderGallery from './js/render-functions';
 
-const form = document.querySelector('#searchForm');
-const input = document.querySelector('#searchImg');
-const listImages = document.querySelector('.list-images');
-const loader = document.querySelector('.loader');
-const moreBtn = document.querySelector('#moreBtn');
+const searchForm = document.querySelector('.search-form');
+const galleryList = document.querySelector('.gallery');
+const loadMoreBtn = document.querySelector('button[data-load]');
 
-const gallery = new SimpleLightbox('.list-images a', {
+const { fetchingGalleryPage, resetNextPageNum } = fetchingGallery();
+let userRequest = '';
+
+const galleryLightbox = new SimpleLightbox('.gallery a', {
   captionsData: 'alt',
   captionDelay: 250,
 });
-let page = 1;
-let totalLoadedImages = 0;
-let currentQuery = '';
-let totalHits = 0;
 
-form.addEventListener('submit', e => {
-  e.preventDefault();
-  listImages.innerHTML = '';
-  loader.style.display = 'block';
-  currentQuery = input.value.trim();
-  page = 1;
+searchForm.addEventListener('submit', async event => {
+  event.preventDefault();
 
-  fetchImages(currentQuery)
-    .then(photos => {
-      totalHits = photos.totalHits;
-      const totalPages = Math.ceil(totalHits / 15);
+  userRequest = event.target.elements.requestValue.value.trim();
 
-      if (photos.hits.length === 0) {
-        iziToast.error({
-          timeout: 2500,
-          position: 'topRight',
-          message:
-            'Sorry, there are no images matching your search query. Please try again!',
-        });
-        loader.style.display = 'none';
-        moreBtn.style.display = 'none';
-        return;
-      }
-      const markup = imgList(photos.hits);
-      listImages.innerHTML = markup;
-      totalLoadedImages = photos.hits.length;
-      moreBtn.style.display = page < totalPages ? 'flex' : 'none';
-      loader.style.display = 'none';
-      gallery.refresh();
-    })
-    .catch(error => {
+  if (!userRequest) {
+    return;
+  }
+
+  resetNextPageNum();
+  clearGallery();
+  showLoader(searchForm);
+  hideLoadMoreBtn();
+
+  try {
+    const { hits: firstPage, isLastPage } = await fetchingGalleryPage(
+      userRequest
+    );
+
+    if (!firstPage.length) {
       iziToast.error({
-        timeout: 2500,
+        message:
+          'Sorry, there are no images matching your search query. Please try again!',
         position: 'topRight',
-        message: `Error: ${error.message || 'Something went wrong'}`,
       });
-      loader.style.display = 'none';
-      moreBtn.style.display = 'none';
+
+      removeLoader();
+
+      return;
+    }
+
+    renderGallery(firstPage, galleryList);
+    galleryLightbox.refresh();
+
+    removeLoader();
+    showLoadMoreBtn(isLastPage);
+  } catch (error) {
+    console.error(error);
+
+    iziToast.error({
+      message: 'Ooops! Something went wrong. Try again later',
+      position: 'topRight',
     });
-  input.value = '';
+
+    removeLoader();
+  }
+
+  searchForm.reset();
 });
 
-moreBtn.addEventListener('click', () => {
-  page += 1;
-  loader.style.display = 'block';
-  moreBtn.style.display = 'none';
+loadMoreBtn.addEventListener('click', async () => {
+  showLoader(galleryList);
+  hideLoadMoreBtn();
 
-  fetchImages(currentQuery, page)
-    .then(photos => {
-      totalLoadedImages += photos.hits.length;
-      const totalPages = Math.ceil(totalHits / 15);
-      
-      const markup = imgList(photos.hits);
-      listImages.insertAdjacentHTML('beforeend', markup);
-      gallery.refresh();
-      loader.style.display = 'none';
+  const { height: itemHeight } = document
+    .querySelector('.gallery-item')
+    .getBoundingClientRect();
 
-      if (page >= totalPages || totalLoadedImages >= totalHits) {
-        iziToast.error({
-          position: 'topRight',
-          message: "We're sorry, but you've reached the end of search results.",
-        });
-        moreBtn.style.display = 'none';
-      } else {
-        moreBtn.style.display = 'flex';
-      }
-      
-      const imgItem = document.querySelector('.photo-item');
-      const cardHeight = imgItem.getBoundingClientRect().height;
+  try {
+    const { hits: nextPage, isLastPage } = await fetchingGalleryPage(
+      userRequest
+    );
 
-      window.scrollBy({
-        top: cardHeight * 2,
-        behavior: 'smooth',
-      });
-    })
-    .catch(error => {
-      iziToast.error({
-        timeout: 2500,
-        position: 'topRight',
-        message: `Error: ${error.message || 'Something went wrong'}`,
-      });
-      loader.style.display = 'none';
-      moreBtn.style.display = 'flex';
+    removeLoader();
+
+    renderGallery(nextPage, galleryList);
+    galleryLightbox.refresh();
+
+    window.scrollBy(0, itemHeight * 2);
+    showLoadMoreBtn(isLastPage);
+  } catch (error) {
+    console.error(error);
+
+    iziToast.error({
+      message: 'Ooops! Something went wrong. Try again later',
+      position: 'topRight',
     });
+
+    removeLoader();
+  }
 });
+
+function showLoader(leftNeighborNode) {
+  leftNeighborNode.insertAdjacentHTML(
+    'afterend',
+    `<span class='loader'></span>`
+  );
+}
+
+function removeLoader(loaderNode = document.querySelector('.loader')) {
+  if (loaderNode) {
+    loaderNode.remove();
+  }
+}
+
+function showLoadMoreBtn(isLastPage) {
+  if (loadMoreBtn.classList.contains('visually-hidden')) {
+    if (isLastPage) {
+      iziToast.info({
+        message: "We're sorry, but you've reached the end of search results.",
+        position: 'topRight',
+      });
+    } else {
+      loadMoreBtn.classList.remove('visually-hidden');
+    }
+  }
+}
+
+function hideLoadMoreBtn() {
+  loadMoreBtn.classList.add('visually-hidden');
+}
+
+function clearGallery() {
+  galleryList.innerHTML = '';
+}
